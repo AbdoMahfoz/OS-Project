@@ -6,6 +6,7 @@
 //NOTE: All kernel heap allocations are multiples of PAGE_SIZE (4KB)
 
 int heap_count[heap_frames];
+uint32 phys_addr_table[heap_frames];
 char* starting_address = KERNEL_HEAP_START;
 
 void* kmalloc(unsigned int size)
@@ -87,6 +88,7 @@ void* kmalloc(unsigned int size)
 			{
 				struct Frame_Info* x;
 				allocate_frame(&x);
+				phys_addr_table[page_number] = to_physical_address(x);
 				map_frame(ptr_page_directory,x,starting_address,PERM_WRITEABLE);
 				starting_address+=PAGE_SIZE;
 				counter++;
@@ -118,9 +120,11 @@ void kfree(void* virtual_address)
 	//refer to the project presentation and documentation for details
 	char* address = (char*)virtual_address;
 	int page_number = (address - (char*)KERNEL_HEAP_START) / PAGE_SIZE;
+	int temp = page_number;
 	//cprintf("releasing %d pages from %x\n", heap_count[page_number], address);
 	for(int i=0;i<heap_count[page_number];i++)
 	{
+		phys_addr_table[temp++] = 0;
 		unmap_frame(ptr_page_directory,address);
 		address +=PAGE_SIZE;
 	}
@@ -132,8 +136,14 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 {
 	//TODO: [PROJECT 2018 - MS1 - [1] Kernel Heap] kheap_virtual_address()
 	// Write your code here, remove the panic and write your code
-	panic("kheap_virtual_address() is not implemented yet...!!");
-
+	//panic("kheap_virtual_address() is not implemented yet...!!");
+	for(int i = 0; i < heap_frames; i++)
+	{
+		if(phys_addr_table[i] == ROUNDDOWN(physical_address, PAGE_SIZE))
+		{
+			return KERNEL_HEAP_START + (i*PAGE_SIZE) + (physical_address & ((1 << 12) - 1));
+		}
+	}
 	//return the virtual address corresponding to given physical_address
 	//refer to the project presentation and documentation for details
 
@@ -147,8 +157,8 @@ unsigned int kheap_physical_address(unsigned int virtual_address)
 {
 	//TODO: [PROJECT 2018 - MS1 - [1] Kernel Heap] kheap_physical_address()
 	// Write your code here, remove the panic and write your code
-	panic("kheap_physical_address() is not implemented yet...!!");
-	return 0;
+	//panic("kheap_physical_address() is not implemented yet...!!");
+	return phys_addr_table[(virtual_address - KERNEL_HEAP_START) / PAGE_SIZE] + (virtual_address & ((1 << 12) - 1));
 }
 
 
