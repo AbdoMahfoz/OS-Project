@@ -23,25 +23,25 @@ void* kmalloc(unsigned int size)
 	{
 		starting_address = (char*)KERNEL_HEAP_START;
 	}
-	cprintf("Requsting %d pages, %d bytes, starting addres = %x\n",page_count, size, starting_address);
+	//cprintf("Requsting %d pages, %d bytes, starting addres = %x\n",page_count, size, starting_address);
 	while(counter < heap_frames)//law malftsh el lafa kamla
 	{
 		int page_number;
 		bool is_empty = 1;
-		cprintf("requsting %d pages\n", ((((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE) + 1));
-		if(((((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE) + 1) < page_count)
+		//cprintf("Ahead of starting address %d free pages\n", (((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE));
+		if((((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE) < page_count)
 		{
-			cprintf("->Circling back to start\n");
-			counter += (((char*)KERNEL_HEAP_MAX  - starting_address + 1) / PAGE_SIZE) + 2;
+			//cprintf("->Circling back to start\n");
+			counter += (((char*)KERNEL_HEAP_MAX  - starting_address + 1) / PAGE_SIZE) + 1;
 			starting_address = (char*)KERNEL_HEAP_START;
 			page_number = 0;
 		}
 		else
 		{
 			page_number = (starting_address - (char*)KERNEL_HEAP_START) / PAGE_SIZE;
-			cprintf("->Starting at page_number = %d\n", page_number);
+			//cprintf("->Starting at page_number = %d\n", page_number);
 		}
-		cprintf("->moving starting address to some free space\n");
+		//cprintf("->moving starting address to some free space\n");
 		while(counter < heap_frames)
 		{
 			if(starting_address > (char*)KERNEL_HEAP_MAX)
@@ -51,11 +51,11 @@ void* kmalloc(unsigned int size)
 			}
 			if(heap_count[page_number])
 			{
-				cprintf("we got %d pages resevered at %x, jumping to", heap_count[page_number], starting_address);
+				//cprintf("we got %d pages resevered at %x, jumping to ", heap_count[page_number], starting_address);
 				starting_address += heap_count[page_number] * PAGE_SIZE;
 				counter += heap_count[page_number];
 				page_number += heap_count[page_number];
-				cprintf("%x\n", starting_address);
+				//cprintf("%x\n", starting_address);
 			}
 			else
 			{
@@ -66,12 +66,12 @@ void* kmalloc(unsigned int size)
 		{
 			break;
 		}
-		cprintf("->counter = %d, moved to %x\n",counter, starting_address);
+		//cprintf("->counter = %d, moved to %x\n",counter, starting_address);
 		for(int i=0;i<page_count;i++)
 		{
 		   if(heap_count[page_number+i]!=0)
 	    	{
-			   cprintf("->found reserved area at page %d\n", page_number+i);
+			   //cprintf("->found reserved area at page %d\n", page_number+i);
 			   counter += i;
 			   page_number += i;
 			   starting_address += i * PAGE_SIZE;
@@ -95,11 +95,11 @@ void* kmalloc(unsigned int size)
 		}
 		if(is_empty)
 		{
-			cprintf("Done: %x\n", evaluated_address);
+			//cprintf("Done: %x\n", evaluated_address);
 			return (void*)evaluated_address;
 		}
 	}
-	cprintf("Fail, starting address = %x\n", starting_address);
+	//cprintf("Fail, starting address = %x\n", starting_address);
 	return NULL;
 	//TODO: [PROJECT 2018 - BONUS1] Implement the BEST FIT strategy for Kernel allocation
 	// Beside the NEXT FIT
@@ -118,7 +118,7 @@ void kfree(void* virtual_address)
 	//refer to the project presentation and documentation for details
 	char* address = (char*)virtual_address;
 	int page_number = (address - (char*)KERNEL_HEAP_START) / PAGE_SIZE;
-	cprintf("releasing %d pages from %x\n", heap_count[page_number], address);
+	//cprintf("releasing %d pages from %x\n", heap_count[page_number], address);
 	for(int i=0;i<heap_count[page_number];i++)
 	{
 		unmap_frame(ptr_page_directory,address);
