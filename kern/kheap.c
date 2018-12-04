@@ -19,6 +19,10 @@ void* kmalloc(unsigned int size)
 	//NOTE: All kernel heap allocations are multiples of PAGE_SIZE (4KB)
 	//refer to the project presentation and documentation for details
 	int page_count = (size / PAGE_SIZE) + (size % PAGE_SIZE != 0);
+	if(page_count > heap_frames)
+	{
+		return 0;
+	}
 	int counter = 0;
 	if(starting_address > (char*)KERNEL_HEAP_MAX)
 	{
@@ -29,19 +33,8 @@ void* kmalloc(unsigned int size)
 	{
 		int page_number;
 		bool is_empty = 1;
-		//cprintf("Ahead of starting address %d free pages\n", (((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE));
-		if((((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE) < page_count)
-		{
-			//cprintf("->Circling back to start\n");
-			counter += (((char*)KERNEL_HEAP_MAX  - starting_address + 1) / PAGE_SIZE) + 1;
-			starting_address = (char*)KERNEL_HEAP_START;
-			page_number = 0;
-		}
-		else
-		{
-			page_number = (starting_address - (char*)KERNEL_HEAP_START) / PAGE_SIZE;
-			//cprintf("->Starting at page_number = %d\n", page_number);
-		}
+		page_number = (starting_address - (char*)KERNEL_HEAP_START) / PAGE_SIZE;
+		//cprintf("->Starting at page_number = %d\n", page_number);
 		//cprintf("->moving starting address to some free space\n");
 		while(counter < heap_frames)
 		{
@@ -63,11 +56,18 @@ void* kmalloc(unsigned int size)
 				break;
 			}
 		}
+		//cprintf("Ahead of starting address %d free pages\n", (((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE));
+		if((((char*)KERNEL_HEAP_MAX - starting_address + 1) / PAGE_SIZE) < page_count)
+		{
+			//cprintf("->Circling back to start\n");
+			counter += (((char*)KERNEL_HEAP_MAX  - starting_address + 1) / PAGE_SIZE) + 1;
+			starting_address = (char*)KERNEL_HEAP_START;
+			page_number = 0;
+		}
 		if(counter >= heap_frames)
 		{
 			break;
 		}
-		//cprintf("->counter = %d, moved to %x\n",counter, starting_address);
 		for(int i=0;i<page_count;i++)
 		{
 		   if(heap_count[page_number+i]!=0)
@@ -91,12 +91,8 @@ void* kmalloc(unsigned int size)
 				phys_addr_table[page_number] = to_physical_address(x);
 				map_frame(ptr_page_directory,x,starting_address,PERM_WRITEABLE);
 				starting_address+=PAGE_SIZE;
-				counter++;
 				page_number++;
 			}
-		}
-		if(is_empty)
-		{
 			//cprintf("Done: %x\n", evaluated_address);
 			return (void*)evaluated_address;
 		}
