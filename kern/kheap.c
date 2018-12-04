@@ -176,7 +176,44 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	// Write your code here, remove the panic and write your code
 
 
-	panic("krealloc() is not implemented yet...!!");
-	return NULL;
-
+	//panic("krealloc() is not implemented yet...!!");
+	if(virtual_address == 0)
+	{
+		return kmalloc(new_size);
+	}
+	if(new_size == 0)
+	{
+		kfree(virtual_address);
+		return 0;
+	}
+	uint32 addr = (uint32)virtual_address;
+	char* oldStartingAddress = starting_address;
+	int page_number = (addr - KERNEL_HEAP_START)/PAGE_SIZE;
+	int oldSize = heap_count[page_number];
+	char block[oldSize];
+	for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+	{
+		block[i] = ((char*)virtual_address)[i];
+	}
+	kfree(virtual_address);
+	char* newAddr = (char*)kmalloc(new_size);
+	if(newAddr == 0)
+	{
+		starting_address = virtual_address;
+		kmalloc(oldSize);
+		for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+		{
+			((char*)virtual_address)[i] = block[i];
+		}
+		starting_address = oldStartingAddress;
+		return 0;
+	}
+	else
+	{
+		for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+		{
+			((char*)newAddr)[i] = block[i];
+		}
+		return newAddr;
+	}
 }
