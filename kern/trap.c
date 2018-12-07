@@ -465,7 +465,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 {
 	//TODO: [PROJECT 2018 - MS1 + MS2 - [2] Page Fault Handler]
 	// Write your code here, remove the panic and write your code
-	panic("page_fault_handler() is not implemented yet...!!");
+	//panic("page_fault_handler() is not implemented yet...!!");
 
 
 	/* =============================================== CASE I [MILESTONE II] ==============================================*/
@@ -477,7 +477,35 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 	 * is rapidly increasing their memory usage*/
 
 	/* ============================================== PLACEMENT [MILESTONE I] ================================================*/
-	/* When main memory is plentiful, the virtual memory manager allows the resident sets of active processes to grow.*/
+		/* When main memory is plentiful, the virtual memory manager allows the resident sets of active processes to grow.*/
+		struct Frame_Info* ptr_fii = NULL;
+		int rr = allocate_frame(&ptr_fii);
+		//if(r!=E_NO_MEM)
+		//{
+
+		map_frame(curenv->env_page_directory, ptr_fii, (void*) fault_va,
+				PERM_USER | PERM_WRITEABLE);
+		if (pf_read_env_page(curenv, (void*) fault_va) == E_PAGE_NOT_EXIST_IN_PF) {
+			if (fault_va >= USTACKBOTTOM && fault_va < USTACKTOP) {
+				pf_add_empty_env_page(curenv, fault_va, 0);}
+			else {
+
+				panic("page Error");
+			}
+
+		}
+		//env_page_ws_set_entry(curenv, indexx, fault_va);
+
+		for(uint32 i = 0; i < curenv->page_WS_max_size; i++)
+		{
+			if(env_page_ws_is_entry_empty(curenv, i) == 1)
+			{
+				env_page_ws_set_entry(curenv, i ,ROUNDDOWN(fault_va,PAGE_SIZE));
+				curenv->page_last_WS_index = i;
+				return;
+			}
+		}
+
 
 
 
