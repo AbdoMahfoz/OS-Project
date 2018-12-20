@@ -187,33 +187,109 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		return 0;
 	}
 	uint32 addr = (uint32)virtual_address;
-	char* oldStartingAddress = starting_address;
+	addr = ROUNDDOWN(addr, PAGE_SIZE);
 	int page_number = (addr - KERNEL_HEAP_START)/PAGE_SIZE;
 	int oldSize = heap_count[page_number];
-	char block[oldSize];
-	for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+	int newSize = (new_size / PAGE_SIZE) + (new_size % PAGE_SIZE != 0);
+	if(oldSize >= newSize)
 	{
-		block[i] = ((char*)virtual_address)[i];
+		return virtual_address;
 	}
-	kfree(virtual_address);
-	char* newAddr = (char*)kmalloc(new_size);
-	if(newAddr == 0)
+	/*
+	if(oldSize > newSize)
 	{
-		starting_address = virtual_address;
-		kmalloc(oldSize);
-		for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+		for(int i = newSize; i < oldSize; i++)
 		{
-			((char*)virtual_address)[i] = block[i];
+			phys_addr_table[page_number + i] = 0;
+			unmap_frame(ptr_page_directory, (void*)(addr + (PAGE_SIZE * i)));
 		}
-		starting_address = oldStartingAddress;
-		return 0;
+		heap_count[page_number] = newSize;
+		return virtual_address;
 	}
+	*/
 	else
 	{
-		for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+		int fPageNumber = page_number + oldSize;
+		int bPageNumber = page_number - 1;
+		int requiredPageCount = newSize - oldSize;
+		bool f1 = 1, f2 = 1;
+		int fc = 0, bc = 0;
+		for(int i = 0; i < requiredPageCount && (f1 || f2); i++)
 		{
-			((char*)newAddr)[i] = block[i];
+			if(f1)
+			{
+				if(heap_count[fPageNumber + i])
+				{
+					f1 = 0;
+				}
+				else
+				{
+					fc++;
+				}
+			}
+			if(f2)
+			{
+				if(heap_count[bPageNumber - i])
+				{
+					f2 = 0;
+				}
+				else
+				{
+					bc++;
+				}
+			}
 		}
-		return newAddr;
+		//Forward extension
+		if(fc >= requiredPageCount)
+		{
+			//cprintf("\noldSize = %d, newSize = %d, freeFrames = %d\n", oldSize, newSize, sys_calculate_free_frames());
+			heap_count[page_number] = newSize;
+			addr += oldSize * PAGE_SIZE;
+			for(int i = 0; i < newSize - oldSize; i++)
+			{
+				//cprintf("bew\n");
+				struct Frame_Info* x;
+				allocate_frame(&x);
+				phys_addr_table[fPageNumber++] = to_physical_address(x);
+				map_frame(ptr_page_directory,x,(void*)addr,PERM_WRITEABLE);
+				addr += PAGE_SIZE;
+			}
+			return virtual_address;
+		}
+		//Shift and extend
+		else if(fc + bc >= requiredPageCount)
+		{
+			bPageNumber -= requiredPageCount - fc - 1;
+			heap_count[page_number] = 0;
+			heap_count[bPageNumber] = newSize;
+			char* cAddr =(char*)(addr - (bc * PAGE_SIZE));
+			for(int i = 0; i < newSize * PAGE_SIZE; i++)
+			{
+				if(phys_addr_table[bPageNumber] == 0)
+				{
+					struct Frame_Info* x;
+					allocate_frame(&x);
+					phys_addr_table[bPageNumber] = to_physical_address(x);
+					map_frame(ptr_page_directory,x,(void*)(cAddr + (i * PAGE_SIZE)),PERM_WRITEABLE);
+				}
+				cAddr[i] = ((char*)addr)[i];
+				if(i != 0 && i % PAGE_SIZE == 0)
+				{
+					bPageNumber++;
+				}
+			}
+			return (void*)cAddr;
+		}
+		//just call kmalloc already!
+		else
+		{
+			char* cAddr = (char*)kmalloc(new_size);
+			for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+			{
+				cAddr[i] = ((char*)addr)[i];
+			}
+			kfree((void*)addr);
+			return (void*)cAddr;
+		}
 	}
 }

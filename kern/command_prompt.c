@@ -44,6 +44,7 @@ extern uint32 enableBuffering();
 extern uint32 isBufferingEnabled();
 extern void setModifiedBufferLength(uint32 length) ;
 extern uint32 getModifiedBufferLength();
+extern int test_krealloc();
 
 int execute_command(char *command_string);
 int command_writeusermem(int number_of_arguments, char **arguments);
@@ -97,6 +98,7 @@ int command_test_kfree(int number_of_arguments, char **arguments);
 int command_test_kheap_phys_addr(int number_of_arguments, char **arguments);
 int command_test_kheap_virt_addr(int number_of_arguments, char **arguments);
 int command_test_three_creation_functions(int number_of_arguments, char **arguments);
+int command_test_krealloc(int number_of_arguments, char **arguments);
 
 //2018
 int command_sch_RR(int number_of_arguments, char **arguments);
@@ -163,6 +165,7 @@ struct Command commands[] =
 		{"tstkphysaddr", "Kernel Heap: test kheap_phys_addr", command_test_kheap_phys_addr},
 		{"tstkvirtaddr", "Kernel Heap: test kheap_virt_addr", command_test_kheap_virt_addr},
 		{"tst3functions", "Env Load: test the creation of new dir, tables and pages WS", command_test_three_creation_functions},
+		{"tstkrealloc","Kernel realloc: test realloc (virtual address = 0)",command_test_krealloc }
 
 };
 
@@ -1117,6 +1120,10 @@ int command_test_kheap_virt_addr(int number_of_arguments, char **arguments)
 int command_test_three_creation_functions(int number_of_arguments, char **arguments)
 {
 	test_three_creation_functions();
+	return 0;
+}
+int command_test_krealloc(int number_of_arguments, char **arguments) {
+	test_krealloc();
 	return 0;
 }
 
