@@ -195,18 +195,6 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	{
 		return virtual_address;
 	}
-	/*
-	if(oldSize > newSize)
-	{
-		for(int i = newSize; i < oldSize; i++)
-		{
-			phys_addr_table[page_number + i] = 0;
-			unmap_frame(ptr_page_directory, (void*)(addr + (PAGE_SIZE * i)));
-		}
-		heap_count[page_number] = newSize;
-		return virtual_address;
-	}
-	*/
 	else
 	{
 		int fPageNumber = page_number + oldSize;

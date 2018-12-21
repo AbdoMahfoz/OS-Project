@@ -115,7 +115,7 @@ void* malloc(uint32 size)
 				page_number++;
 			}
 			*/
-			sys_allocateMem(evaluated_address, page_count * PAGE_SIZE);
+			sys_allocateMem(evaluated_address, page_count);
 			starting_address += PAGE_SIZE * page_count;
 			//cprintf("Done: %x\n", evaluated_address);
 			return (void*)evaluated_address;
@@ -158,7 +158,7 @@ void free(void* virtual_address)
 		address +=PAGE_SIZE;
 	}
 	*/
-	sys_freeMem(address, heap_count[page_number]);
+	sys_freeMem((uint32)address, heap_count[page_number]);
 	heap_count[page_number]=0;
 
 }
@@ -189,8 +189,118 @@ void *realloc(void *virtual_address, uint32 new_size)
 {
 	//TODO: [PROJECT 2018 - BONUS3] User Heap Realloc [User Side]
 	// Write your code here, remove the panic and write your code
-	panic("realloc() is not implemented yet...!!");
-
+	//panic("realloc() is not implemented yet...!!");
+	if(virtual_address == 0)
+	{
+		return malloc(new_size);
+	}
+	if(new_size == 0)
+	{
+		free(virtual_address);
+		return 0;
+	}
+	uint32 addr = (uint32)virtual_address;
+	addr = ROUNDDOWN(addr, PAGE_SIZE);
+	int page_number = (addr - USER_HEAP_START)/PAGE_SIZE;
+	int oldSize = heap_count[page_number];
+	int newSize = (new_size / PAGE_SIZE) + (new_size % PAGE_SIZE != 0);
+	if(oldSize >= newSize)
+	{
+		return virtual_address;
+	}
+	else
+	{
+		int fPageNumber = page_number + oldSize;
+		int bPageNumber = page_number - 1;
+		int requiredPageCount = newSize - oldSize;
+		bool f1 = 1, f2 = 1;
+		int fc = 0, bc = 0;
+		for(int i = 0; i < requiredPageCount && (f1 || f2); i++)
+		{
+			if(f1)
+			{
+				if(heap_count[fPageNumber + i])
+				{
+					f1 = 0;
+				}
+				else
+				{
+					fc++;
+				}
+			}
+			if(f2)
+			{
+				if(heap_count[bPageNumber - i])
+				{
+					f2 = 0;
+				}
+				else
+				{
+					bc++;
+				}
+			}
+		}
+		//Forward extension
+		if(fc >= requiredPageCount)
+		{
+			//cprintf("\noldSize = %d, newSize = %d, freeFrames = %d\n", oldSize, newSize, sys_calculate_free_frames());
+			heap_count[page_number] = newSize;
+			addr += oldSize * PAGE_SIZE;
+			/*
+			for(int i = 0; i < newSize - oldSize; i++)
+			{
+				//cprintf("bew\n");
+				struct Frame_Info* x;
+				allocate_frame(&x);
+				phys_addr_table[fPageNumber++] = to_physical_address(x);
+				map_frame(ptr_page_directory,x,(void*)addr,PERM_WRITEABLE);
+				addr += PAGE_SIZE;
+			}
+			*/
+			sys_allocateMem(addr, (newSize - oldSize) * PAGE_SIZE);
+			return virtual_address;
+		}
+		//Shift and extend
+		else if(fc + bc >= requiredPageCount)
+		{
+			bPageNumber -= requiredPageCount - fc - 1;
+			heap_count[page_number] = 0;
+			heap_count[bPageNumber] = newSize;
+			char* cAddr =(char*)(addr - (bc * PAGE_SIZE));
+			sys_allocateMem(cAddr, (requiredPageCount - fc) * PAGE_SIZE);
+			for(int i = 0; i < newSize * PAGE_SIZE; i++)
+			{
+				/*
+				if(phys_addr_table[bPageNumber] == 0)
+				{
+					struct Frame_Info* x;
+					allocate_frame(&x);
+					phys_addr_table[bPageNumber] = to_physical_address(x);
+					map_frame(ptr_page_directory,x,(void*)(cAddr + (i * PAGE_SIZE)),PERM_WRITEABLE);
+				}
+				*/
+				cAddr[i] = ((char*)addr)[i];
+				/*
+				if(i != 0 && i % PAGE_SIZE == 0)
+				{
+					bPageNumber++;
+				}
+				*/
+			}
+			return (void*)cAddr;
+		}
+		//just call malloc already!
+		else
+		{
+			char* cAddr = (char*)malloc(new_size);
+			for(int i = 0; i < oldSize * PAGE_SIZE; i++)
+			{
+				cAddr[i] = ((char*)addr)[i];
+			}
+			free((void*)addr);
+			return (void*)cAddr;
+		}
+	}
 	return 0;
 }
 

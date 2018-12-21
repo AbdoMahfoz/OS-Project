@@ -767,11 +767,14 @@ void allocateMem(struct Env* e, uint32 virtual_address, uint32 size)
 {
 	//TODO: [PROJECT 2018 - MS2 - [4] User Heap] allocateMem() [Kernel Side]
 	// Write your code here, remove the panic and write your code
-	panic("allocateMem() is not implemented yet...!!");
+	//panic("allocateMem() is not implemented yet...!!");
 
 	//This function should allocate ALL pages of the required range in the PAGE FILE
 	//and allocate NOTHING in the main memory
-
+	for(int i = 0; i < size; i++)
+	{
+		pf_add_empty_env_page(e, virtual_address + (i * PAGE_SIZE), 0);
+	}
 }
 
 
@@ -781,13 +784,47 @@ void freeMem(struct Env* e, uint32 virtual_address, uint32 size)
 {
 	//TODO: [PROJECT 2018 - MS2 - [4] User Heap] freeMem() [Kernel Side]
 	// Write your code here, remove the panic and write your code
-	panic("freeMem() is not implemented yet...!!");
+	//panic("freeMem() is not implemented yet...!!");
 
 	//This function should:
 	//1. Free ALL pages of the given range from the Page File
 	//2. Free ONLY pages that are resident in the working set from the memory
 	//3. Removes ONLY the empty page tables (i.e. not used) (no pages are mapped in the table)
-
+	for(int i = 0; i < size; i++)
+	{
+		pf_remove_env_page(e, virtual_address + (i * PAGE_SIZE));
+	}
+	for(int i = 0; i < e->page_WS_max_size; i++)
+	{
+		uint32 addr = env_page_ws_get_virtual_address(e, i);
+		if(addr >= virtual_address && addr < virtual_address + (PAGE_SIZE * size))
+		{
+			env_page_ws_clear_entry(e, i);
+			unmap_frame((void*)e->env_page_directory, (void*)addr);
+		}
+	}
+	for(int i = 0; i < size; i++)
+	{
+		uint32* pg_table = NULL;
+		get_page_table(e->env_page_directory, (void*)(virtual_address + (i * PAGE_SIZE)), &pg_table);
+		if(pg_table != NULL)
+		{
+			bool eraseIt = 1;
+			for(int j = 0; j < PAGE_SIZE / sizeof(uint32); j++)
+			{
+				if(pg_table[j] != 0)
+				{
+					eraseIt = 0;
+					break;
+				}
+			}
+			if(eraseIt)
+			{
+				unmap_frame(e->env_page_directory, (void*)pg_table);
+				e->env_page_directory[PDX(virtual_address + (i * PAGE_SIZE))] = 0;
+			}
+		}
+	}
 }
 
 void __freeMem_with_buffering(struct Env* e, uint32 virtual_address, uint32 size)
