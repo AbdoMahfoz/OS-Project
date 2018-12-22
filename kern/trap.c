@@ -439,11 +439,13 @@ void remove_pages(struct Env * e, uint32 PTBR, uint32 size) {
 void FreeWs(struct Env * curenv, bool x) {
 	int size = env_page_ws_get_size(curenv);
 	if (x || size == curenv->page_WS_max_size) {
-		int NumberOfPagesToBeRemoved = (curenv->page_WS_max_size
+		uint32 NumberOfPagesToBeRemoved = (curenv->percentage_of_WS_pages_to_be_removed
+				* env_page_ws_get_size(curenv) + 99) / 100;
+/*		int NumberOfPagesToBeRemoved = (curenv->page_WS_max_size
 				* curenv->percentage_of_WS_pages_to_be_removed);
 		NumberOfPagesToBeRemoved = ROUNDUP(NumberOfPagesToBeRemoved, 100);
 		NumberOfPagesToBeRemoved = NumberOfPagesToBeRemoved / 100;
-		/*cprintf(" Number Of Pages To be Removed  '%d'\n ",
+	*/	/*cprintf(" Number Of Pages To be Removed  '%d'\n ",
 		 NumberOfPagesToBeRemoved);
 		 cprintf(" Percentage '%d'\n ",
 		 curenv->percentage_of_WS_pages_to_be_removed);
@@ -490,9 +492,11 @@ void FreeWs(struct Env * curenv, bool x) {
 				}
 				unmap_frame(curenv->env_page_directory, (void*) Victum);
 				env_page_ws_invalidate(curenv, Victum);
+				env_page_ws_clear_entry(curenv, index);
 			} else {
 				unmap_frame(curenv->env_page_directory, (void*) Victum);
 				env_page_ws_invalidate(curenv, Victum);
+				env_page_ws_clear_entry(curenv, index);
 			}
 			c++;
 		}
@@ -502,51 +506,30 @@ void FreeWs(struct Env * curenv, bool x) {
 }
 void ClearWs(struct Env * curenv) {
 	int size = env_page_ws_get_size(curenv);
-	int index = 0;
-	int c = 0;
-	while (c <= size) {
-		if (size == 0 || index>=curenv->page_WS_max_size)
-			return;
-		while (1) {
-			if (env_page_ws_is_entry_empty(curenv, index) == 1) {
-				if (index < curenv->page_WS_max_size){
-					cprintf("empty Page \n");
-					index++;
-				}				else if (index >= curenv->page_WS_max_size){
-					return;
+	for (int q = 0; q < curenv->page_WS_max_size; q++) {
+		if (env_page_ws_is_entry_empty(curenv, q) != 1) {
+			uint32* pgtable = NULL;
+			uint32 Victum = env_page_ws_get_virtual_address(curenv, q);
+			struct Frame_Info *ptr_frame_info = get_frame_info(
+					curenv->env_page_directory, (void*) Victum, &pgtable);
+			if ((pgtable[PTX(Victum)] & PERM_MODIFIED) != 0) {
+				//Update and UnMap
+				int ret = pf_update_env_page(curenv, (void*) Victum,
+						ptr_frame_info);
+
+				if (ret != 0) {
+					panic("page_fault_handler() is not implemented yet...!!");
 				}
-				break;
+
+				unmap_frame(curenv->env_page_directory, (void*) Victum);
+				env_page_ws_invalidate(curenv, Victum);
+				env_page_ws_clear_entry(curenv, q);
 			} else {
-				break;
+				unmap_frame(curenv->env_page_directory, (void*) Victum);
+				env_page_ws_invalidate(curenv, Victum);
+				env_page_ws_clear_entry(curenv, q);
 			}
 		}
-		cprintf("size  = %d\n", size);
-		cprintf("index = %d\n", index);
-		cprintf("Cycle Counter = %d\n", c);
-		cprintf("Max Index = %d \n",curenv->page_WS_max_size);
-
-		uint32* pgtable = NULL;
-		uint32 Victum = env_page_ws_get_virtual_address(curenv, index);
-		struct Frame_Info *ptr_frame_info = get_frame_info(
-				curenv->env_page_directory, (void*) Victum, &pgtable);
-		if ((pgtable[PTX(Victum)] & PERM_MODIFIED) != 0) {
-			//Update and UnMap
-
-			int ret = pf_update_env_page(curenv, (void*) Victum,
-					ptr_frame_info);
-
-			if (ret != 0) {
-				panic("page_fault_handler() is not implemented yet...!!");
-			}
-
-			unmap_frame(curenv->env_page_directory, (void*) Victum);
-			env_page_ws_clear_entry(curenv, index);
-		} else {
-			unmap_frame(curenv->env_page_directory, (void*) Victum);
-			env_page_ws_clear_entry(curenv, index);
-		}
-		c++;
-		index++;
 	}
 }
 void page_fault_handler(struct Env * curenv, uint32 fault_va) {
