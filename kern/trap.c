@@ -436,25 +436,46 @@ void remove_pages(struct Env * e, uint32 PTBR, uint32 size) {
 		env_page_ws_clear_entry(e, j);
 	}
 }
-void FreeWs(struct Env * curenv, bool x) {
+void FreeWs(struct Env * curenv) {
+	uint32 no_pages = (curenv->percentage_of_WS_pages_to_be_removed
+			* env_page_ws_get_size(curenv) + 99) / 100;
+
+	for (int i = 0; i < no_pages; i++) {
+		int idx = -1;
+		uint32 last = 0xffffffff;
+		for (int j = 0; j < curenv->page_WS_max_size; j++) {
+			if (!env_page_ws_is_entry_empty(curenv, j)
+					&& env_page_ws_get_time_stamp(curenv, j) < last) {
+				last = env_page_ws_get_time_stamp(curenv, j);
+				idx = j;
+			}
+		}
+		if (idx == -1) {
+			assert(0);
+			continue;
+		}
+		uint32* virtual_address = (uint32 *) env_page_ws_get_virtual_address(
+				curenv, idx);
+		uint32* page_table = NULL;
+		struct Frame_Info* frame = get_frame_info(curenv->env_page_directory,
+				virtual_address, &page_table);
+		if (pt_get_page_permissions(curenv, virtual_address) & PERM_MODIFIED)
+			pf_update_env_page(curenv, virtual_address, frame);
+		unmap_frame(curenv->env_page_directory, virtual_address);
+		env_page_ws_clear_entry(curenv, idx);
+	}
+	return;
+}
+void lru(struct Env * curenv) {
 	int size = env_page_ws_get_size(curenv);
-	if (x || size == curenv->page_WS_max_size) {
-		uint32 NumberOfPagesToBeRemoved = (curenv->percentage_of_WS_pages_to_be_removed
-				* env_page_ws_get_size(curenv) + 99) / 100;
-/*		int NumberOfPagesToBeRemoved = (curenv->page_WS_max_size
-				* curenv->percentage_of_WS_pages_to_be_removed);
-		NumberOfPagesToBeRemoved = ROUNDUP(NumberOfPagesToBeRemoved, 100);
-		NumberOfPagesToBeRemoved = NumberOfPagesToBeRemoved / 100;
-	*/	/*cprintf(" Number Of Pages To be Removed  '%d'\n ",
-		 NumberOfPagesToBeRemoved);
-		 cprintf(" Percentage '%d'\n ",
-		 curenv->percentage_of_WS_pages_to_be_removed);
-		 cprintf(" max size '%d'\n ", curenv->page_WS_max_size);
-		 */
+	if (size == curenv->page_WS_max_size) {
+		int NumberOfPagesToBeRemoved = ((curenv->page_WS_max_size
+				* curenv->percentage_of_WS_pages_to_be_removed) / 100)
+				+ (((curenv->page_WS_max_size
+						* curenv->percentage_of_WS_pages_to_be_removed) % 100)
+						!= 0);
 		int c = 0;
 		while (c < NumberOfPagesToBeRemoved) {
-			if (env_page_ws_get_size(curenv) <= c)
-				break;
 			int index = 0;
 			uint32 min = 0;
 			while (1) {
@@ -466,7 +487,7 @@ void FreeWs(struct Env * curenv, bool x) {
 				}
 			}
 
-			for (int q = index; q < curenv->page_WS_max_size; q++) {
+			for (int q = index + 1; q < curenv->page_WS_max_size; q++) {
 				if (env_page_ws_is_entry_empty(curenv, q) == 1) {
 					continue;
 				} else {
@@ -492,68 +513,46 @@ void FreeWs(struct Env * curenv, bool x) {
 				}
 				unmap_frame(curenv->env_page_directory, (void*) Victum);
 				env_page_ws_invalidate(curenv, Victum);
-				env_page_ws_clear_entry(curenv, index);
 			} else {
 				unmap_frame(curenv->env_page_directory, (void*) Victum);
 				env_page_ws_invalidate(curenv, Victum);
-				env_page_ws_clear_entry(curenv, index);
 			}
 			c++;
 		}
 
 	}
-
 }
 void ClearWs(struct Env * curenv) {
-	int size = env_page_ws_get_size(curenv);
-	for (int q = 0; q < curenv->page_WS_max_size; q++) {
-		if (env_page_ws_is_entry_empty(curenv, q) != 1) {
-			uint32* pgtable = NULL;
-			uint32 Victum = env_page_ws_get_virtual_address(curenv, q);
-			struct Frame_Info *ptr_frame_info = get_frame_info(
-					curenv->env_page_directory, (void*) Victum, &pgtable);
-			if ((pgtable[PTX(Victum)] & PERM_MODIFIED) != 0) {
-				//Update and UnMap
-				int ret = pf_update_env_page(curenv, (void*) Victum,
-						ptr_frame_info);
-
-				if (ret != 0) {
-					panic("page_fault_handler() is not implemented yet...!!");
-				}
-
-				unmap_frame(curenv->env_page_directory, (void*) Victum);
-				env_page_ws_invalidate(curenv, Victum);
-				env_page_ws_clear_entry(curenv, q);
-			} else {
-				unmap_frame(curenv->env_page_directory, (void*) Victum);
-				env_page_ws_invalidate(curenv, Victum);
-				env_page_ws_clear_entry(curenv, q);
-			}
-		}
+	for (int i = 0; i < curenv->page_WS_max_size; i++) {
+		if (env_page_ws_is_entry_empty(curenv, i))
+			continue;
+		uint32* virtual_address = (uint32 *) env_page_ws_get_virtual_address(
+				curenv, i);
+		uint32* page_table = NULL;
+		struct Frame_Info* frame = get_frame_info(curenv->env_page_directory,
+				virtual_address, &page_table);
+		if (page_table[PTX(virtual_address)] & PERM_MODIFIED)
+			pf_update_env_page(curenv, virtual_address, frame);
+		unmap_frame(curenv->env_page_directory, virtual_address);
+		env_page_ws_clear_entry(curenv, i);
 	}
 }
 void page_fault_handler(struct Env * curenv, uint32 fault_va) {
-	uint32 FreeFrames = calculate_free_frames();
-	uint32 FramePercentage = ((FreeFrames / number_of_frames) * 100);
-	if (FramePercentage < memory_scarce_threshold_percentage) {
-		FreeWs(curenv, 1);
-		struct Env* TempEnv = NULL;
-		for (int q = 0; q < num_of_ready_queues; q++) {
-			LIST_FOREACH(TempEnv,& env_ready_queues[q])
-			{
-				FreeWs(TempEnv, 1);
-			}
-		}
-		LIST_FOREACH(TempEnv,&env_exit_queue)
-		{
-			//FreeWs(TempEnv, 1);
-			ClearWs(TempEnv);
-		}
+	uint32 freem_frames_number = calculate_free_frames();
+	uint32 free_space_percentage = (freem_frames_number * 100)
+			/ number_of_frames;
 
-	} else {
-		FreeWs(curenv, 0);
+	if (free_space_percentage < memory_scarce_threshold_percentage) {
+		FreeWs(curenv);
+		struct Env *temp_env;
+		for (int i = 0; i < num_of_ready_queues; i++)
+			LIST_FOREACH(temp_env,&(env_ready_queues[i]))
+				FreeWs(temp_env);
+		LIST_FOREACH(temp_env,&env_exit_queue)
+			ClearWs(temp_env);
+	}else {
+		lru(curenv);
 	}
-
 	//zizo
 	struct Frame_Info* ptr_fii = NULL;
 	int rr = allocate_frame(&ptr_fii);
