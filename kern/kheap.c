@@ -206,7 +206,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		{
 			if(f1)
 			{
-				if(heap_count[fPageNumber + i])
+				if(heap_count[fPageNumber + i] || fPageNumber + i > KERNEL_HEAP_MAX)
 				{
 					f1 = 0;
 				}
@@ -217,7 +217,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 			}
 			if(f2)
 			{
-				if(heap_count[bPageNumber - i])
+				if(heap_count[bPageNumber - i] || bPageNumber - i < KERNEL_HEAP_START)
 				{
 					f2 = 0;
 				}
@@ -272,6 +272,10 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		else
 		{
 			char* cAddr = (char*)kmalloc(new_size);
+			if(cAddr == NULL)
+			{
+				return NULL;
+			}
 			for(int i = 0; i < oldSize * PAGE_SIZE; i++)
 			{
 				cAddr[i] = ((char*)addr)[i];

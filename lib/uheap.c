@@ -219,7 +219,7 @@ void *realloc(void *virtual_address, uint32 new_size)
 		{
 			if(f1)
 			{
-				if(heap_count[fPageNumber + i])
+				if(heap_count[fPageNumber + i] || fPageNumber + i > USER_HEAP_MAX)
 				{
 					f1 = 0;
 				}
@@ -230,7 +230,7 @@ void *realloc(void *virtual_address, uint32 new_size)
 			}
 			if(f2)
 			{
-				if(heap_count[bPageNumber - i])
+				if(heap_count[bPageNumber - i] || bPageNumber - i < USER_HEAP_START)
 				{
 					f2 = 0;
 				}
@@ -267,8 +267,8 @@ void *realloc(void *virtual_address, uint32 new_size)
 			heap_count[page_number] = 0;
 			heap_count[bPageNumber] = newSize;
 			char* cAddr =(char*)(USER_HEAP_START + (bPageNumber * PAGE_SIZE));
-			sys_allocateMem((uint32)cAddr, requiredPageCount - fc);
-			for(int i = 0; i < newSize * PAGE_SIZE; i++)
+			sys_allocateMem((uint32)cAddr, requiredPageCount - fc + 1);
+			for(int i = 0; i < oldSize * PAGE_SIZE; i++)
 			{
 				/*
 				if(phys_addr_table[bPageNumber] == 0)
@@ -293,6 +293,10 @@ void *realloc(void *virtual_address, uint32 new_size)
 		else
 		{
 			char* cAddr = (char*)malloc(new_size);
+			if(cAddr == NULL)
+			{
+				return NULL;
+			}
 			for(int i = 0; i < oldSize * PAGE_SIZE; i++)
 			{
 				cAddr[i] = ((char*)addr)[i];

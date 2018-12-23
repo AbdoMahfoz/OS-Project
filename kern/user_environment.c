@@ -99,6 +99,7 @@ DECLARE_START_OF(mergesort_noleakage);
 DECLARE_START_OF(quicksort_noleakage);
 DECLARE_START_OF(tst_realloc_1);
 DECLARE_START_OF(tst_realloc_2);
+DECLARE_START_OF(tst_realloc_3);
 DECLARE_START_OF(tst_freeing_stack);
 
 //2018
@@ -164,6 +165,7 @@ struct UserProgramInfo userPrograms[] = {
 		//[3] BONUSES
 		{ "tr1", "tests realloc (1): normal cases", PTR_START_OF(tst_realloc_1)},
 		{ "tr2", "tests realloc (2): special cases", PTR_START_OF(tst_realloc_2)},
+		{ "tr3", "tests realloc (3): special cases", PTR_START_OF(tst_realloc_3)},
 		{ "tfs", "Tests freeing the unused stack pages", PTR_START_OF(tst_freeing_stack)},
 };
 
