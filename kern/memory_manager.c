@@ -787,7 +787,7 @@ void freeMem(struct Env* e, uint32 virtual_address, uint32 size) {
 				kfree((void*)pg_table);
 				//unmap_frame(e->env_page_directory, (void*) pg_table);
 				e->env_page_directory[PDX(virtual_address + (i * PAGE_SIZE))] = 0;
-				tlbflush();
+				//tlbflush();
 			}
 		}
 	}
