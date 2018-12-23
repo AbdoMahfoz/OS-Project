@@ -453,8 +453,6 @@ void FreeWs(struct Env * curenv, bool x) {
 		 */
 		int c = 0;
 		while (c < NumberOfPagesToBeRemoved) {
-			if (env_page_ws_get_size(curenv) <= c)
-				break;
 			int index = 0;
 			uint32 min = 0;
 			while (1) {

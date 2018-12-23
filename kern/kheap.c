@@ -250,7 +250,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 			bPageNumber -= requiredPageCount - fc - 1;
 			heap_count[page_number] = 0;
 			heap_count[bPageNumber] = newSize;
-			char* cAddr =(char*)(addr - (bc * PAGE_SIZE));
+			char* cAddr =(char*)(KERNEL_HEAP_START + (bPageNumber * PAGE_SIZE));
 			for(int i = 0; i < newSize * PAGE_SIZE; i++)
 			{
 				if(phys_addr_table[bPageNumber] == 0)

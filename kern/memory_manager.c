@@ -759,6 +759,7 @@ void freeMem(struct Env* e, uint32 virtual_address, uint32 size) {
 	//1. Free ALL pages of the given range from the Page File
 	//2. Free ONLY pages that are resident in the working set from the memory
 	//3. Removes ONLY the empty page tables (i.e. not used) (no pages are mapped in the table)
+
 	for (int i = 0; i < size; i++) {
 		pf_remove_env_page(e, virtual_address + (i * PAGE_SIZE));
 	}
@@ -783,9 +784,10 @@ void freeMem(struct Env* e, uint32 virtual_address, uint32 size) {
 				}
 			}
 			if (eraseIt) {
-				unmap_frame(e->env_page_directory, (void*) pg_table);
-				e->env_page_directory[PDX(virtual_address + (i * PAGE_SIZE))] =
-						0;
+				kfree((void*)pg_table);
+				//unmap_frame(e->env_page_directory, (void*) pg_table);
+				e->env_page_directory[PDX(virtual_address + (i * PAGE_SIZE))] = 0;
+				tlbflush();
 			}
 		}
 	}

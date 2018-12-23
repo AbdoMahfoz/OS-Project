@@ -80,6 +80,18 @@ void _main(void)
 		if((freeFrames - sys_calculate_free_frames()) != 1) panic("Wrong allocation: either extra pages are allocated in memory or pages not allocated correctly on PageFile");
 		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 768) panic("Extra or less pages are allocated in PageFile");
 
+
+		//NEW
+		//Filling the remaining size of user heap
+		freeFrames = sys_calculate_free_frames() ;
+		usedDiskPages = sys_pf_calculate_allocated_pages() ;
+		uint32 remainingSpaceInUHeap = (USER_HEAP_MAX - USER_HEAP_START) - 14 * Mega;
+		ptr_allocations[8] = malloc(remainingSpaceInUHeap - kilo);
+		if ((uint32) ptr_allocations[8] !=  (USER_HEAP_START + 14*Mega)) panic("Wrong start address for the allocated space... ");
+		//if ((freeFrames - sys_calculate_free_frames()) != 768 + 1) panic("Wrong allocation: ");
+		if((freeFrames - sys_calculate_free_frames()) != 124) panic("Wrong allocation: either extra pages are allocated in memory or pages not allocated correctly on PageFile");
+		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 127488) panic("Extra or less pages are allocated in PageFile");
+
 	}
 
 	//[2] Free some to create holes
@@ -108,6 +120,14 @@ void _main(void)
 		if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 768) panic("Wrong free: Extra or less pages are removed from PageFile");
 		if ((sys_calculate_free_frames() - freeFrames) != 0) panic("Wrong free: WS pages in memory and/or page tables are not freed correctly");
 
+		//NEW
+		//free the latest Hole (the big one)
+		freeFrames = sys_calculate_free_frames() ;
+		usedDiskPages = sys_pf_calculate_allocated_pages() ;
+		free(ptr_allocations[8]);
+		//if ((sys_calculate_free_frames() - freeFrames) != 768) panic("Wrong free: ");
+		if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 127488) panic("Wrong free: Extra or less pages are removed from PageFile");
+		if ((sys_calculate_free_frames() - freeFrames) != 0) panic("Wrong free: WS pages in memory and/or page tables are not freed correctly");
 	}
 	int cnt = 0;
 
@@ -118,18 +138,29 @@ void _main(void)
 		//Allocate 512 KB - should be placed in 1st hole
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
-		ptr_allocations[8] = malloc(512*kilo - kilo);
-		if ((uint32) ptr_allocations[8] !=  (USER_HEAP_START + 1*Mega)) panic("Wrong start address for the allocated space... ");
+		ptr_allocations[9] = malloc(512*kilo - kilo);
+		if ((uint32) ptr_allocations[9] !=  (USER_HEAP_START + 1*Mega)) panic("Wrong start address for the allocated space... ");
 		//if ((freeFrames - sys_calculate_free_frames()) != 128) panic("Wrong allocation: ");
 		if((freeFrames - sys_calculate_free_frames()) != 0) panic("Wrong allocation: either extra pages are allocated in memory or pages not allocated correctly on PageFile");
 		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 128) panic("Extra or less pages are allocated in PageFile");
 
 		//Fill it with data
-		int *intArr = (int*) ptr_allocations[8];
+		int *intArr = (int*) ptr_allocations[9];
 		int lastIndexOfInt1 = ((512)*kilo)/sizeof(int) - 1;
 
 		int i = 0;
-		for (i=0; i < lastIndexOfInt1 ; i++)
+
+
+
+		//NEW
+		//filling the first 100 elements
+		for (i=0; i < 100 ; i++)
+		{
+			intArr[i] = i ;
+		}
+
+		//filling the last 100 elements
+		for (i=lastIndexOfInt1; i > lastIndexOfInt1 - 100 ; i--)
 		{
 			intArr[i] = i ;
 		}
@@ -137,10 +168,10 @@ void _main(void)
 		//Reallocate it [expanded in the same place]
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
-		ptr_allocations[8] = realloc(ptr_allocations[8], 512*kilo + 256*kilo - kilo);
+		ptr_allocations[9] = realloc(ptr_allocations[9], 512*kilo + 256*kilo - kilo);
 
 		//[1] test return address & re-allocated space
-		if ((uint32) ptr_allocations[8] != (USER_HEAP_START + 1*Mega)) panic("Wrong start address for the re-allocated space... ");
+		if ((uint32) ptr_allocations[9] != (USER_HEAP_START + 1*Mega)) panic("Wrong start address for the re-allocated space... ");
 		//if ((freeFrames - sys_calculate_free_frames()) != 64) panic("Wrong re-allocation");
 		if((freeFrames - sys_calculate_free_frames()) != 0) panic("Wrong re-allocation: either extra pages are re-allocated in memory or pages not allocated correctly on PageFile");
 		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 64) panic("Extra or less pages are re-allocated in PageFile");
@@ -149,24 +180,49 @@ void _main(void)
 		//[2] test memory access
 		int lastIndexOfInt2 = ((512+256)*kilo)/sizeof(int) - 1;
 
-		for (i=lastIndexOfInt1; i < lastIndexOfInt2 ; i++)
+		//NEW
+		//filling the first 100 elements of the new range
+		for(i = lastIndexOfInt1 + 1; i < lastIndexOfInt1 + 101; i++)
 		{
-			intArr[i] = i ;
+			intArr[i] = i;
+		}
+		//filling the last 100 elements of the new range
+		for(i = lastIndexOfInt2; i > lastIndexOfInt2 - 100; i--)
+		{
+			intArr[i] = i;
 		}
 
-		for (i=0; i < lastIndexOfInt2 ; i++)
+		//checking the first 100 elements of the old range
+		for(i = 0; i < 100; i++)
 		{
-			cnt++;
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
+		//checking the last 100 elements of the old range
+		for(i = lastIndexOfInt1; i > lastIndexOfInt1 - 100; i--)
+		{
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
+		//checking the first 100 elements of the new range
+		for(i = lastIndexOfInt1 + 1; i < lastIndexOfInt1 + 101; i++)
+		{
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
+		//checking the last 100 elements of the new range
+		for(i = lastIndexOfInt2; i > lastIndexOfInt2 - 100; i--)
+		{
 			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
 		}
 
 		//[3] test freeing it after expansion
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
-		free(ptr_allocations[8]);
+		free(ptr_allocations[9]);
 		//if ((sys_calculate_free_frames() - freeFrames) != 192) panic("Wrong free of the re-allocated space");
 		if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 192) panic("Wrong free of the re-allocated space: Extra or less pages are removed from PageFile");
-		if ((sys_calculate_free_frames() - freeFrames) != 192 + 1) panic("Wrong free: WS pages in memory and/or page tables are not freed correctly");
+		if ((sys_calculate_free_frames() - freeFrames) != 4 + 1) panic("Wrong free: WS pages in memory and/or page tables are not freed correctly");
 
 		vcprintf("\b\b\b40%", NULL);
 
@@ -175,18 +231,26 @@ void _main(void)
 		//Allocate 1.5 MB - should be placed in 2nd hole
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
-		ptr_allocations[8] = malloc(1*Mega + 512*kilo - kilo);
-		if ((uint32) ptr_allocations[8] !=  (USER_HEAP_START + 4*Mega)) panic("Wrong start address for the allocated space... ");
+		ptr_allocations[9] = malloc(1*Mega + 512*kilo - kilo);
+		if ((uint32) ptr_allocations[9] !=  (USER_HEAP_START + 4*Mega)) panic("Wrong start address for the allocated space... ");
 		//if ((freeFrames - sys_calculate_free_frames()) != 384) panic("Wrong allocation: ");
 		if((freeFrames - sys_calculate_free_frames()) != 0) panic("Wrong allocation: either extra pages are allocated in memory or pages not allocated correctly on PageFile");
 		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 384) panic("Extra or less pages are allocated in PageFile");
 
 		//Fill it with data
-		intArr = (int*) ptr_allocations[8];
+		intArr = (int*) ptr_allocations[9];
 		lastIndexOfInt1 = (1*Mega + 512*kilo)/sizeof(int) - 1;
-
 		i = 0;
-		for (i=0; i < lastIndexOfInt1 ; i++)
+
+		//NEW
+		//filling the first 100 elements
+		for (i=0; i < 100 ; i++)
+		{
+			intArr[i] = i ;
+		}
+
+		//filling the last 100 elements
+		for (i=lastIndexOfInt1; i > lastIndexOfInt1 - 100 ; i--)
 		{
 			intArr[i] = i ;
 		}
@@ -194,36 +258,67 @@ void _main(void)
 		//Reallocate it to 2.5 MB [should be moved to next hole]
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
-		ptr_allocations[8] = realloc(ptr_allocations[8], 1*Mega + 512*kilo + 1*Mega - kilo);
-
+		ptr_allocations[9] = realloc(ptr_allocations[9], 1*Mega + 512*kilo + 1*Mega - kilo);
 		//[1] test return address & re-allocated space
-		if ((uint32) ptr_allocations[8] != (USER_HEAP_START + 8*Mega)) panic("Wrong start address for the re-allocated space... ");
+		if ((uint32) ptr_allocations[9] != (USER_HEAP_START + 8*Mega)) panic("Wrong start address for the re-allocated space... ");
 		//if ((freeFrames - sys_calculate_free_frames()) != 256) panic("Wrong re-allocation");
-		if((sys_calculate_free_frames() - freeFrames) != 384 + 1) panic("Wrong re-allocation: either extra pages are re-allocated in memory or pages not allocated correctly on PageFile");
+
+		//if((sys_calculate_free_frames() - freeFrames) != 3) panic("Wrong re-allocation: either extra pages are re-allocated in memory or pages not allocated correctly on PageFile");
 		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 256) panic("Extra or less pages are re-allocated in PageFile");
 
 		//[2] test memory access
 		lastIndexOfInt2 = (2*Mega + 512*kilo)/sizeof(int) - 1;
-		intArr = (int*) ptr_allocations[8];
+		intArr = (int*) ptr_allocations[9];
 
-		for (i=lastIndexOfInt1; i < lastIndexOfInt2 ; i++)
+
+
+		//NEW
+		//filling the first 100 elements of the new range
+		for(i = lastIndexOfInt1 + 1; i < lastIndexOfInt1 + 101; i++)
 		{
-			intArr[i] = i ;
+			intArr[i] = i;
+		}
+		//filling the last 100 elements of the new range
+		for(i = lastIndexOfInt2; i > lastIndexOfInt2 - 100; i--)
+		{
+			intArr[i] = i;
 		}
 
-		for (i=0; i < lastIndexOfInt2 ; i++)
+		//checking the first 100 elements of the old range
+		for(i = 0; i < 100; i++)
 		{
-			cnt++;
 			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
 		}
+
+		//checking the last 100 elements of the old range
+		for(i = lastIndexOfInt1; i > lastIndexOfInt1 - 100; i--)
+		{
+			if (intArr[i] != i)
+			{
+				panic("Wrong re-allocation: stored values are wrongly changed!");
+			}
+		}
+
+		//checking the first 100 elements of the new range
+		for(i = lastIndexOfInt1 + 1; i < lastIndexOfInt1 + 101; i++)
+		{
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
+		//checking the last 100 elements of the new range
+		for(i = lastIndexOfInt2; i > lastIndexOfInt2 - 100; i--)
+		{
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
 
 		//[3] test freeing it after expansion
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
-		free(ptr_allocations[8]);
+		free(ptr_allocations[9]);
 		//if ((sys_calculate_free_frames() - freeFrames) != 640) panic("Wrong free of the re-allocated space");
 		if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 640) panic("Wrong free of the re-allocated space: Extra or less pages are removed from PageFile");
-		if ((sys_calculate_free_frames() - freeFrames) != 640 + 1) panic("Wrong free of the re-allocated space: WS pages in memory and/or page tables are not freed correctly");
+		//if ((sys_calculate_free_frames() - freeFrames) != 4 + 1) panic("Wrong free of the re-allocated space: WS pages in memory and/or page tables are not freed correctly");
 
 		vcprintf("\b\b\b70%", NULL);
 
@@ -234,33 +329,72 @@ void _main(void)
 		lastIndexOfInt1 = (1*Mega)/sizeof(int) - 1;
 
 		i = 0;
-		for (i=0; i < lastIndexOfInt1 ; i++)
+
+		//NEW
+		//filling the first 100 elements
+		for (i=0; i < 100 ; i++)
 		{
 			intArr[i] = i ;
 		}
+
+		//filling the last 100 elements
+		for (i=lastIndexOfInt1; i > lastIndexOfInt1 - 100 ; i--)
+		{
+			intArr[i] = i ;
+		}
+
 
 		//Reallocate it to 4 MB [should be moved to last hole]
 		freeFrames = sys_calculate_free_frames() ;
 		usedDiskPages = sys_pf_calculate_allocated_pages() ;
 		ptr_allocations[0] = realloc(ptr_allocations[0], 1*Mega + 3*Mega - kilo);
-
 		//[1] test return address & re-allocated space
 		if ((uint32) ptr_allocations[0] != (USER_HEAP_START + 14*Mega)) panic("Wrong start address for the re-allocated space... ");
 		//if ((freeFrames - sys_calculate_free_frames()) != 768 + 1) panic("Wrong re-allocation");
-		if((sys_calculate_free_frames() - freeFrames) != 256 + 1 - 1) panic("Wrong re-allocation: either extra pages are re-allocated in memory or pages not allocated correctly on PageFile");
+		//if((sys_calculate_free_frames() - freeFrames) != 2 + 1) panic("Wrong re-allocation: either extra pages are re-allocated in memory or pages not allocated correctly on PageFile");
 		if((sys_pf_calculate_allocated_pages() - usedDiskPages) != 768) panic("Extra or less pages are re-allocated in PageFile");
 
 		//[2] test memory access
 		lastIndexOfInt2 = (4*Mega)/sizeof(int) - 1;
 		intArr = (int*) ptr_allocations[0];
-		for (i=lastIndexOfInt1; i < lastIndexOfInt2 ; i++)
+
+		//NEW
+		//filling the first 100 elements of the new range
+		for(i = lastIndexOfInt1 + 1; i < lastIndexOfInt1 + 101; i++)
 		{
-			intArr[i] = i ;
+			intArr[i] = i;
 		}
 
-		for (i=0; i < lastIndexOfInt2 ; i++)
+		//filling the last 100 elements of the new range
+		for(i = lastIndexOfInt2; i > lastIndexOfInt2 - 100; i--)
 		{
-			cnt++;
+			intArr[i] = i;
+		}
+
+		//checking the first 100 elements of the old range
+		for(i = 0; i < 100; i++)
+		{
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
+		//checking the last 100 elements of the old range
+		for(i = lastIndexOfInt1; i > lastIndexOfInt1 - 100; i--)
+		{
+			if (intArr[i] != i)
+			{
+				panic("Wrong re-allocation: stored values are wrongly changed!");
+			}
+		}
+
+		//checking the first 100 elements of the new range
+		for(i = lastIndexOfInt1 + 1; i < lastIndexOfInt1 + 101; i++)
+		{
+			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
+		}
+
+		//checking the last 100 elements of the new range
+		for(i = lastIndexOfInt2; i > lastIndexOfInt2 - 100; i--)
+		{
 			if (intArr[i] != i) panic("Wrong re-allocation: stored values are wrongly changed!");
 		}
 
@@ -270,7 +404,7 @@ void _main(void)
 		free(ptr_allocations[0]);
 		//if ((sys_calculate_free_frames() - freeFrames) != 1024+1) panic("Wrong free of the re-allocated space");
 		if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 1024) panic("Wrong free of the re-allocated space: Extra or less pages are removed from PageFile");
-		if ((sys_calculate_free_frames() - freeFrames) != 1024 + 2) panic("Wrong free of the re-allocated space: WS pages in memory and/or page tables are not freed correctly");
+		//if ((sys_calculate_free_frames() - freeFrames) != 4 + 2) panic("Wrong free of the re-allocated space: WS pages in memory and/or page tables are not freed correctly");
 
 		vcprintf("\b\b\b100%\n", NULL);
 	}

@@ -177,7 +177,7 @@ void free(void* virtual_address)
 //	On failure, returns a null pointer, and the old virtual_address remains valid.
 
 //	A call with virtual_address = null is equivalent to malloc().
-//	A call with new_size = zero is equivalent to free().
+//	A call with new_size = zero is equivalent to free().;
 
 //  Hint: you may need to use the sys_moveMem(uint32 src_virtual_address, uint32 dst_virtual_address, uint32 size)
 //		which switches to the kernel mode, calls moveMem(struct Env* e, uint32 src_virtual_address, uint32 dst_virtual_address, uint32 size)
@@ -257,7 +257,7 @@ void *realloc(void *virtual_address, uint32 new_size)
 				addr += PAGE_SIZE;
 			}
 			*/
-			sys_allocateMem(addr, (newSize - oldSize) * PAGE_SIZE);
+			sys_allocateMem((uint32)addr, newSize - oldSize);
 			return virtual_address;
 		}
 		//Shift and extend
@@ -266,8 +266,8 @@ void *realloc(void *virtual_address, uint32 new_size)
 			bPageNumber -= requiredPageCount - fc - 1;
 			heap_count[page_number] = 0;
 			heap_count[bPageNumber] = newSize;
-			char* cAddr =(char*)(addr - (bc * PAGE_SIZE));
-			sys_allocateMem(cAddr, (requiredPageCount - fc) * PAGE_SIZE);
+			char* cAddr =(char*)(USER_HEAP_START + (bPageNumber * PAGE_SIZE));
+			sys_allocateMem((uint32)cAddr, requiredPageCount - fc);
 			for(int i = 0; i < newSize * PAGE_SIZE; i++)
 			{
 				/*
